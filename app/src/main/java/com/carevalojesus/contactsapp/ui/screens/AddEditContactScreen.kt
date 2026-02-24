@@ -8,12 +8,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.carevalojesus.contactsapp.data.model.Dish
 import com.carevalojesus.contactsapp.ui.viewmodel.RestaurantViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -25,6 +27,9 @@ fun AddEditContactScreen(viewModel: RestaurantViewModel, restaurantId: Int, navC
 
     val dishes by viewModel.dishes.collectAsState()
     var showDialog by remember { mutableStateOf(false) }
+
+    // Variables para saber si estamos editando
+    var editingDish by remember { mutableStateOf<Dish?>(null) }
     var name by remember { mutableStateOf("") }
     var price by remember { mutableStateOf("") }
 
@@ -40,7 +45,12 @@ fun AddEditContactScreen(viewModel: RestaurantViewModel, restaurantId: Int, navC
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showDialog = true }) {
+            FloatingActionButton(onClick = {
+                editingDish = null
+                name = ""
+                price = ""
+                showDialog = true
+            }) {
                 Icon(Icons.Default.Add, contentDescription = "Agregar Plato")
             }
         }
@@ -51,8 +61,20 @@ fun AddEditContactScreen(viewModel: RestaurantViewModel, restaurantId: Int, navC
                     headlineContent = { Text(dish.name) },
                     supportingContent = { Text("S/ ${dish.price}") },
                     trailingContent = {
-                        IconButton(onClick = { viewModel.deleteDish(dish) }) {
-                            Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = MaterialTheme.colorScheme.error)
+                        Row {
+                            // BOTÓN DE EDITAR
+                            IconButton(onClick = {
+                                editingDish = dish
+                                name = dish.name
+                                price = dish.price.toString()
+                                showDialog = true
+                            }) {
+                                Icon(Icons.Default.Edit, contentDescription = "Editar", tint = MaterialTheme.colorScheme.primary)
+                            }
+                            // BOTÓN DE ELIMINAR
+                            IconButton(onClick = { viewModel.deleteDish(dish) }) {
+                                Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = MaterialTheme.colorScheme.error)
+                            }
                         }
                     }
                 )
@@ -62,7 +84,7 @@ fun AddEditContactScreen(viewModel: RestaurantViewModel, restaurantId: Int, navC
         if (showDialog) {
             AlertDialog(
                 onDismissRequest = { showDialog = false },
-                title = { Text("Nuevo Plato") },
+                title = { Text(if (editingDish == null) "Nuevo Plato" else "Editar Plato") },
                 text = {
                     Column {
                         OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nombre del plato") })
@@ -79,10 +101,13 @@ fun AddEditContactScreen(viewModel: RestaurantViewModel, restaurantId: Int, navC
                     Button(onClick = {
                         if (name.isNotBlank()) {
                             val priceDouble = price.toDoubleOrNull() ?: 0.0
-                            viewModel.addDish(restaurantId, name, priceDouble)
+                            if (editingDish == null) {
+                                viewModel.addDish(restaurantId, name, priceDouble)
+                            } else {
+                                // Actualizamos el plato existente
+                                viewModel.updateDish(editingDish!!.copy(name = name, price = priceDouble))
+                            }
                             showDialog = false
-                            name = ""
-                            price = ""
                         }
                     }) { Text("Guardar") }
                 },

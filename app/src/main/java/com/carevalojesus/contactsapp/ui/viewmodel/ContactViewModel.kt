@@ -15,14 +15,11 @@ import kotlinx.coroutines.launch
 
 class RestaurantViewModel(application: Application) : AndroidViewModel(application) {
 
-    // Conectamos con nuestro nuevo DAO
     private val dao = ContactDatabase.getDatabase(application).restaurantDao()
 
-    // 1. Estado para la lista de Restaurantes
     val restaurants: StateFlow<List<Restaurant>> = dao.getAllRestaurants()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
-    // 2. Estado para los Platos (cambia según el restaurante que seleccionemos)
     private val _dishes = MutableStateFlow<List<Dish>>(emptyList())
     val dishes: StateFlow<List<Dish>> = _dishes.asStateFlow()
 
@@ -33,6 +30,11 @@ class RestaurantViewModel(application: Application) : AndroidViewModel(applicati
         dao.insertRestaurant(Restaurant(name = name, address = address))
     }
 
+    // NUEVA FUNCIÓN: Actualizar restaurante
+    fun updateRestaurant(restaurant: Restaurant) = viewModelScope.launch {
+        dao.updateRestaurant(restaurant)
+    }
+
     fun deleteRestaurant(restaurant: Restaurant) = viewModelScope.launch {
         dao.deleteRestaurant(restaurant)
     }
@@ -40,8 +42,6 @@ class RestaurantViewModel(application: Application) : AndroidViewModel(applicati
     // ========================
     // FUNCIONES DE PLATOS
     // ========================
-
-    // Carga los platos de un restaurante específico
     fun loadDishesForRestaurant(restaurantId: Int) {
         viewModelScope.launch {
             dao.getDishesForRestaurant(restaurantId).collect { listaPlatos ->
@@ -52,6 +52,11 @@ class RestaurantViewModel(application: Application) : AndroidViewModel(applicati
 
     fun addDish(restaurantId: Int, name: String, price: Double) = viewModelScope.launch {
         dao.insertDish(Dish(restaurantId = restaurantId, name = name, price = price))
+    }
+
+    // NUEVA FUNCIÓN: Actualizar plato
+    fun updateDish(dish: Dish) = viewModelScope.launch {
+        dao.updateDish(dish)
     }
 
     fun deleteDish(dish: Dish) = viewModelScope.launch {
