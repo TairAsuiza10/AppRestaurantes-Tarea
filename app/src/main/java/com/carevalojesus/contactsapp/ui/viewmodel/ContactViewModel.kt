@@ -3,82 +3,58 @@ package com.carevalojesus.contactsapp.ui.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.carevalojesus.contactsapp.data.dao.ContactDao
 import com.carevalojesus.contactsapp.data.database.ContactDatabase
-import com.carevalojesus.contactsapp.data.model.Contact
-import kotlinx.coroutines.ExperimentalCoroutinesApi
+import com.carevalojesus.contactsapp.data.model.Dish
+import com.carevalojesus.contactsapp.data.model.Restaurant
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalCoroutinesApi::class)
-class ContactViewModel(application: Application) : AndroidViewModel(application) {
+class RestaurantViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val contactDao: ContactDao = ContactDatabase.getDatabase(application).contactDao()
+    // Conectamos con nuestro nuevo DAO
+    private val dao = ContactDatabase.getDatabase(application).restaurantDao()
 
-    private val _showFavoritesOnly = MutableStateFlow(false)
-    val showFavoritesOnly: StateFlow<Boolean> = _showFavoritesOnly.asStateFlow()
+    // 1. Estado para la lista de Restaurantes
+    val restaurants: StateFlow<List<Restaurant>> = dao.getAllRestaurants()
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
-    // Flujo base que cambia entre todos los contactos y solo los favoritos.
-    val contacts: StateFlow<List<Contact>> = _showFavoritesOnly.flatMapLatest { showFavorites ->
-        if (showFavorites) {
-            contactDao.getFavorites()
-        } else {
-            contactDao.getAllContacts()
-        }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    // 2. Estado para los Platos (cambia según el restaurante que seleccionemos)
+    private val _dishes = MutableStateFlow<List<Dish>>(emptyList())
+    val dishes: StateFlow<List<Dish>> = _dishes.asStateFlow()
 
-    private val _searchQuery = MutableStateFlow("")
-    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+    // ========================
+    // FUNCIONES DE RESTAURANTE
+    // ========================
+    fun addRestaurant(name: String, address: String) = viewModelScope.launch {
+        dao.insertRestaurant(Restaurant(name = name, address = address))
+    }
 
-    // Flujo que combina la lista de contactos con la búsqueda, para ContactListScreen.
-    val filteredContacts: StateFlow<List<Contact>> = combine(contacts, _searchQuery) { contacts, query ->
-        if (query.isBlank()) {
-            contacts
-        } else {
-            contacts.filter {
-                it.firstName.contains(query, ignoreCase = true) ||
-                it.lastName.contains(query, ignoreCase = true) ||
-                it.phone.contains(query, ignoreCase = true)
+    fun deleteRestaurant(restaurant: Restaurant) = viewModelScope.launch {
+        dao.deleteRestaurant(restaurant)
+    }
+
+    // ========================
+    // FUNCIONES DE PLATOS
+    // ========================
+
+    // Carga los platos de un restaurante específico
+    fun loadDishesForRestaurant(restaurantId: Int) {
+        viewModelScope.launch {
+            dao.getDishesForRestaurant(restaurantId).collect { listaPlatos ->
+                _dishes.value = listaPlatos
             }
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    // Flujo dedicado solo para la pantalla de favoritos.
-    val favoriteContacts: StateFlow<List<Contact>> = contactDao.getFavorites()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-
-    fun onSearchQueryChange(query: String) {
-        _searchQuery.value = query
     }
 
-    fun toggleShowFavorites() {
-        _showFavoritesOnly.value = !_showFavoritesOnly.value
+    fun addDish(restaurantId: Int, name: String, price: Double) = viewModelScope.launch {
+        dao.insertDish(Dish(restaurantId = restaurantId, name = name, price = price))
     }
 
-    suspend fun getContactById(id: Int): Contact? {
-        return contactDao.getContactById(id)
-    }
-
-    fun addContact(contact: Contact) = viewModelScope.launch {
-        contactDao.insertContact(contact)
-    }
-
-    fun updateContact(contact: Contact) = viewModelScope.launch {
-        contactDao.updateContact(contact)
-    }
-
-    fun deleteContact(contact: Contact) = viewModelScope.launch {
-        contactDao.deleteContact(contact)
-    }
-
-    fun toggleFavorite(id: Int) = viewModelScope.launch {
-        contactDao.toggleFavorite(id)
+    fun deleteDish(dish: Dish) = viewModelScope.launch {
+        dao.deleteDish(dish)
     }
 }
