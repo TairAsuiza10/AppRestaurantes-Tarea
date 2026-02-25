@@ -9,9 +9,12 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
@@ -28,20 +31,22 @@ fun AddEditContactScreen(viewModel: RestaurantViewModel, restaurantId: Int, navC
     val dishes by viewModel.dishes.collectAsState()
     var showDialog by remember { mutableStateOf(false) }
 
-    // Variables para saber si estamos editando
     var editingDish by remember { mutableStateOf<Dish?>(null) }
     var name by remember { mutableStateOf("") }
     var price by remember { mutableStateOf("") }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Menú del Restaurante") },
+            CenterAlignedTopAppBar(
+                title = { Text("Menú", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
                     }
-                }
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
             )
         },
         floatingActionButton = {
@@ -55,45 +60,76 @@ fun AddEditContactScreen(viewModel: RestaurantViewModel, restaurantId: Int, navC
             }
         }
     ) { padding ->
-        LazyColumn(modifier = Modifier.padding(padding).fillMaxSize()) {
-            items(dishes) { dish ->
-                ListItem(
-                    headlineContent = { Text(dish.name) },
-                    supportingContent = { Text("S/ ${dish.price}") },
-                    trailingContent = {
-                        Row {
-                            // BOTÓN DE EDITAR
-                            IconButton(onClick = {
-                                editingDish = dish
-                                name = dish.name
-                                price = dish.price.toString()
-                                showDialog = true
-                            }) {
-                                Icon(Icons.Default.Edit, contentDescription = "Editar", tint = MaterialTheme.colorScheme.primary)
+        if (dishes.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                Text("Este menú está vacío. ¡Agrega platos!", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline)
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.padding(padding).fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(dishes) { dish ->
+                    // DISEÑO: Usamos OutlinedCard para los platos
+                    OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+                        ListItem(
+                            headlineContent = {
+                                Text(dish.name, fontWeight = FontWeight.Medium)
+                            },
+                            supportingContent = {
+                                // Destacamos el precio con un color y estilo diferente
+                                Text(
+                                    "S/ ${"%.2f".format(dish.price)}",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            },
+                            trailingContent = {
+                                Row {
+                                    IconButton(onClick = {
+                                        editingDish = dish
+                                        name = dish.name
+                                        price = dish.price.toString()
+                                        showDialog = true
+                                    }) {
+                                        Icon(Icons.Default.Edit, contentDescription = "Editar", tint = MaterialTheme.colorScheme.tertiary)
+                                    }
+                                    IconButton(onClick = { viewModel.deleteDish(dish) }) {
+                                        Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = MaterialTheme.colorScheme.error)
+                                    }
+                                }
                             }
-                            // BOTÓN DE ELIMINAR
-                            IconButton(onClick = { viewModel.deleteDish(dish) }) {
-                                Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = MaterialTheme.colorScheme.error)
-                            }
-                        }
+                        )
                     }
-                )
+                }
             }
         }
 
         if (showDialog) {
             AlertDialog(
                 onDismissRequest = { showDialog = false },
+                icon = { Icon(Icons.Default.ShoppingCart, contentDescription = null) },
                 title = { Text(if (editingDish == null) "Nuevo Plato" else "Editar Plato") },
                 text = {
                     Column {
-                        OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nombre del plato") })
+                        OutlinedTextField(
+                            value = name,
+                            onValueChange = { name = it },
+                            label = { Text("Nombre del plato") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
                         Spacer(modifier = Modifier.height(8.dp))
                         OutlinedTextField(
                             value = price,
                             onValueChange = { price = it },
                             label = { Text("Precio (Ej: 15.50)") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            leadingIcon = { Text("S/", modifier = Modifier.padding(start = 12.dp)) }
                         )
                     }
                 },
@@ -104,7 +140,6 @@ fun AddEditContactScreen(viewModel: RestaurantViewModel, restaurantId: Int, navC
                             if (editingDish == null) {
                                 viewModel.addDish(restaurantId, name, priceDouble)
                             } else {
-                                // Actualizamos el plato existente
                                 viewModel.updateDish(editingDish!!.copy(name = name, price = priceDouble))
                             }
                             showDialog = false
